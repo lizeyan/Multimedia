@@ -1,5 +1,6 @@
 from image_codec import *
 from matplotlib import pyplot
+import cProfile
 
 CANON_IXUS_60 = np.asarray([
     [1,  1,  1,  2,  3,  6,  8,  10],
@@ -35,53 +36,62 @@ JPEG_STANDARD_Q = np.asarray([
 ])
 
 
+@profile
 def main():
     output_path = "./output/quantification"
     clean_folder(output_path)
-    gray_scale_lena = gray_scale(Image.open("lena.bmp"))
+    jpeg = np.expand_dims(np.expand_dims(JPEG_STANDARD_Q, 0), 0).astype(np.float64)
+    nikon = np.expand_dims(np.expand_dims(NIKON_COOLPIX_L12, 0), 0).astype(np.float64)
+    canon = np.expand_dims(np.expand_dims(CANON_IXUS_60, 0), 0).astype(np.float64)
+    gray_scale_lena_arr = np.mean(image2arr(Image.open("lena.bmp")), axis=-1)
 
-    def test_quantifier(q, indicator, alpha=1.0, output=False):
-        q = np.asarray(q, dtype=np.float64) * alpha
-        block_shape = np.shape(q)
-        dct_cft_blockwise = blockwise(dct2d_codec(np.asarray(gray_scale_lena), block_shape), block_shape)
-        q_expanded = np.expand_dims(np.expand_dims(q, 0), 0)
-        dct_cft_quantified = (dct_cft_blockwise / q_expanded).astype(int) * q_expanded
-        idct_quantified = idct2d_codec(block_join(dct_cft_quantified), block_shape)
-        psnr_all = psnr(np.asarray(gray_scale_lena), block_join(idct_quantified.astype(np.int8)))
+    def test_quantifier(q: np.ndarray, indicator: str, output=False):
+        dct_cft_quantified = dct2d_codec(gray_scale_lena_arr, block_shape, q)
+        idct_quantified = idct2d_codec(dct_cft_quantified, block_shape)
+
+        psnr_all = psnr(gray_scale_lena_arr, block_join(idct_quantified), 1.0)
         if output:
-            psnr_blockwise = psnr(blockwise(np.asarray(gray_scale_lena), block_shape), blockwise(idct_quantified.astype(np.int8), block_shape))
-            np.savetxt(os.path.join(output_path, "psnr.txt"), psnr_blockwise)
+            psnr_blockwise = psnr(blockwise(gray_scale_lena_arr, block_shape), blockwise(idct_quantified, block_shape), 1.0)
+            np.savetxt(os.path.join(output_path, "%s_psnr.txt" % (indicator,)), psnr_blockwise)
             print("PSNR overall: %fdB, %s" % (psnr_all, indicator))
-            image = Image.fromarray(block_join(idct_quantified).astype(np.int8), "L")
+            image = arr2image(block_join(idct_quantified))
             image.save(os.path.join(output_path, "dct2d_quantification_%s.bmp" % (indicator,)))
         return psnr_all
 
+    test_quantifier(jpeg, "jpeg_1.0", True)
+    test_quantifier(nikon, "nikon_1.0", True)
+    test_quantifier(canon, "canon_1.0", True)
+
     alpha_list = np.arange(0.1, 2, 0.05)
-    psnr_list_jpeg = np.vectorize(lambda x: test_quantifier(JPEG_STANDARD_Q, "jpeg", x))(alpha_list)
-    psnr_list_nikon = np.vectorize(lambda x: test_quantifier(NIKON_COOLPIX_L12, "nikon", x))(alpha_list)
-    psnr_list_canon = np.vectorize(lambda x: test_quantifier(CANON_IXUS_60, "canon", x))(alpha_list)
+    psnr_list_jpeg = np.vectorize(lambda x: test_quantifier(jpeg * x, "jpeg_%f" % x))(alpha_list)
+    psnr_list_nikon = np.vectorize(lambda x: test_quantifier(nikon * x, "nikon_%f" % x))(alpha_list)
+    psnr_list_canon = np.vectorize(lambda x: test_quantifier(canon * x, "canon_%f" % x))(alpha_list)
 
     pyplot.subplot(311)
     pyplot.plot(alpha_list, psnr_list_jpeg)
     pyplot.ylabel("PSNR (dB")
     pyplot.xlabel("alpha")
     pyplot.title("JPEG")
+    print("JPEG finished")
 
     pyplot.subplot(312)
     pyplot.plot(alpha_list, psnr_list_nikon)
     pyplot.xlabel("alpha")
     pyplot.ylabel("PSNR (dB")
     pyplot.title("NIKON")
+    print("NIKON finished")
 
     pyplot.subplot(313)
     pyplot.plot(alpha_list, psnr_list_canon)
     pyplot.xlabel("alpha")
     pyplot.ylabel("PSNR (dB")
     pyplot.title("CANON")
+    print("CANON finished")
 
     pyplot.tight_layout()
     pyplot.savefig(os.path.join(output_path, "psnr_alpha.pdf"))
 
 
 if __name__ == '__main__':
+    block_shape = (8, 8)
     main()

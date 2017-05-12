@@ -18,9 +18,11 @@ def idct1d_codec(arr) -> np.ndarray:
     return idct1d_cft
 
 
-def dct2d_codec(arr, block_size) -> np.ndarray:
+def dct2d_codec(arr: np.ndarray, block_size: tuple, q: np.ndarray=None) -> np.ndarray:
     blocks = blockwise(arr, block_size)
     dct2d_cft = dct(np.swapaxes(dct(np.swapaxes(blocks.astype(np.float64), -1, -2), norm="ortho"), -1, -2), norm="ortho")
+    if q is not None:
+        dct2d_cft = ((dct2d_cft * 255 / q).astype(int) * q).astype(np.float64) / 255
     return block_join(dct2d_cft)
 
 

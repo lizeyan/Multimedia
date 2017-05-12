@@ -10,7 +10,7 @@ def profile(func):
     def wrap(*args, **kwargs):
         tic = time.time()
         result = func(*args, **kwargs)
-        print("Function:", func.__name__, ", Elapsed time:", time.time() - tic, " ms")
+        print("Function:", func.__name__, ", Elapsed time:", time.time() - tic, "s")
         return result
     return wrap
 
