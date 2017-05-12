@@ -6,6 +6,15 @@ import time
 from shutil import *
 
 
+def profile(func):
+    def wrap(*args, **kwargs):
+        tic = time.time()
+        result = func(*args, **kwargs)
+        print("Function:", func.__name__, ", Elapsed time:", time.time() - tic, " ms")
+        return result
+    return wrap
+
+
 def blockwise(matrix, block=(3, 3)):
     shape = (int(matrix.shape[0] / block[0]), int(matrix.shape[1] / block[1])) + block
     strides = (matrix.strides[0] * block[0], matrix.strides[1] * block[1]) + matrix.strides
@@ -22,25 +31,21 @@ def clean_folder(path):
 
 
 def block_join(blocks):
-    r, c = np.size(blocks, 0), np.size(blocks, 1)
-    mat = np.bmat([[np.asmatrix(blocks[row, column]) for column in range(c)] for row in range(r)])
-    return np.asarray(mat)
+    return np.vstack(map(np.hstack, blocks))
 
 
 def _test_block():
     arr = np.arange(36).reshape((6, 6))
     blocks = blockwise(arr, (3, 3))
+    print(blocks)
     re_join = block_join(blocks)
     print(re_join)
 
 
-def profile(func):
-    def wrap(*args, **kwargs):
-        tic = time.time()
-        result = func(*args, **kwargs)
-        print("Function:", func.__name__, ", Elapsed time:", time.time() - tic, " ms")
-        return result
-    return wrap
+def left_top_corner_selector(r, c, ar, ac):
+    ret = np.zeros(shape=(ar, ac), dtype=int)
+    ret[:int(r), :int(c)] = 1
+    return ret
 
 
 def zig_zag_selector(length, rows, columns):
@@ -87,5 +92,5 @@ def _test_zig_zag_selector():
 
 
 if __name__ == '__main__':
-    # _test_block()
-    _test_zig_zag_selector()
+    _test_block()
+    # _test_zig_zag_selector()
