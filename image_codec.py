@@ -4,6 +4,7 @@ import numpy as np
 from utility import *
 
 
+@profile
 def dct1d_codec(arr) -> np.ndarray:
     dct1d_cft = arr.astype(np.float64)
     for axis in range(np.ndim(arr)):
@@ -11,6 +12,7 @@ def dct1d_codec(arr) -> np.ndarray:
     return dct1d_cft
 
 
+@profile
 def idct1d_codec(arr) -> np.ndarray:
     idct1d_cft = arr.astype(np.float64)
     for axis in range(np.ndim(arr)):
@@ -18,30 +20,16 @@ def idct1d_codec(arr) -> np.ndarray:
     return idct1d_cft
 
 
-def dct2d_codec(arr, block_size=(0, 0)) -> np.ndarray:
-    assert len(block_size) == 2
-    block_rows, block_columns = block_size
-    r, c = np.size(arr, 0), np.size(arr, 1)
-    if block_rows is 0:
-        block_rows = r
-    if block_columns is 0:
-        block_columns = c
-    assert block_rows > 0 and block_columns > 0 and r % block_rows == 0 and c % block_columns == 0
-    blocks = blockwise(arr, (block_rows, block_columns))
+@profile
+def dct2d_codec(arr, block_size) -> np.ndarray:
+    blocks = blockwise(arr, block_size)
     dct2d_cft = dct(np.swapaxes(dct(np.swapaxes(blocks.astype(np.float64), -1, -2), type=3, norm="ortho"), -1, -2), type=3, norm="ortho")
     return block_join(dct2d_cft)
 
 
-def idct2d_codec(arr, block_size=(0, 0)) -> np.ndarray:
-    assert len(block_size) == 2
-    block_rows, block_columns = block_size
-    r, c = np.size(arr, 0), np.size(arr, 1)
-    if block_rows is 0:
-        block_rows = r
-    if block_columns is 0:
-        block_columns = c
-    assert block_rows > 0 and block_columns > 0 and r % block_rows == 0 and c % block_columns == 0
-    blocks = blockwise(arr, (block_rows, block_columns))
+@profile
+def idct2d_codec(arr, block_size) -> np.ndarray:
+    blocks = blockwise(arr, block_size)
     idct2d_cft = idct(np.swapaxes(idct(np.swapaxes(blocks.astype(np.float64), -1, -2), type=3, norm="ortho"), -1, -2), type=3, norm="ortho")
     return block_join(idct2d_cft)
 
@@ -54,7 +42,7 @@ def image2arr(image, scale=255) -> np.ndarray:
     return np.asarray(image, dtype=np.float64) / scale
 
 
-def arr2image(arr, scale=255) -> Image.Image:
+def arr2image(arr: np.ndarray, scale: float = 255) -> Image:
     return Image.fromarray(np.asarray(arr * (scale,)).astype(np.int8), "L")
 
 
@@ -87,7 +75,7 @@ def test_dct1d(scale, arr, output_path):
     dct1d_cft *= zig_zag_selector(h * w, np.size(arr, 0), np.size(arr, 1))
 
     Image.fromarray(dct1d_cft.astype(np.int8), "L").save(os.path.join(output_path, "dct1d_cft_lena_%d.bmp" % scale))
-    idct1d_lena = Image.fromarray((idct1d_codec(dct1d_cft) * 255).astype(np.int8), "L")
+    idct1d_lena = arr2image(idct1d_codec(dct1d_cft))
     idct1d_lena.save(os.path.join(output_path, "idct1d_lena_%d.bmp") % scale)
     print("PSNR of 1D DCT codec: %fdB" % psnr(arr * 255, np.asarray(idct1d_lena)), ", use 1/%d DCT coefficients" % scale ** 2)
 
@@ -107,7 +95,7 @@ def test_dct2d(scale, arr, output_path, block_size=(0, 0)):
     Image.fromarray(dct2d_cft.astype(np.int8), "L").save(os.path.join(output_path, "dct2d_cft_lena_%d_%d_%d.bmp") % (block_size + (scale, )))
     idct2d_lena = arr2image(idct2d_codec(dct2d_cft, block_size))
     idct2d_lena.save(os.path.join(output_path, "idct2d_lena_%d_%d_%d.bmp") % (block_size[0], block_size[1], scale))
-    print("PSNR of 2D DCT codec: %fdB, block size: %d, %d" % (psnr(arr * 255, np.asarray(idct2d_lena)), block_size[0], block_size[1]), ", use 1/%d DCT coefficients" % scale)
+    print("PSNR of 2D DCT codec: %fdB, block size: %d, %d" % (psnr(arr * 255, np.asarray(idct2d_lena)), block_size[0], block_size[1]), ", use 1/%d DCT coefficients" % scale ** 2)
 
 
 if __name__ == '__main__':
