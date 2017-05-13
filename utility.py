@@ -1,9 +1,16 @@
 import os
-
+from PIL import Image
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import time
+from datetime import datetime
 from shutil import *
+
+EPS = 1e-15
+
+
+def log(msg, *args, **kwargs):
+    print("[%s]" % str(datetime.now())[:-7], msg, *args, **kwargs)
 
 
 def profile(func):
@@ -89,6 +96,18 @@ def _test_zig_zag_selector():
     print(zig_zag_selector(7, 3, 3))
     print(zig_zag_selector(8, 3, 3))
     print(zig_zag_selector(65, 3, 3))
+
+
+def image2arr(image: Image, scale: float=255) -> np.ndarray:
+    return np.asarray(image, dtype=np.float64) / scale
+
+
+def arr2image(arr: np.ndarray, scale: float = 255) -> Image:
+    return Image.fromarray(np.asarray(arr * (scale,)).astype(np.int8), "L")
+
+
+def euclidean_distance(x, y, axis=-1):
+    return np.mean((x - y) ** 2, axis=axis)
 
 
 if __name__ == '__main__':

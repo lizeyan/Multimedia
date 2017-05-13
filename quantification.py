@@ -38,7 +38,7 @@ JPEG_STANDARD_Q = np.asarray([
 
 @profile
 def main():
-    output_path = "./output/quantification"
+    output_path = "./lab1_output/quantification"
     clean_folder(output_path)
     jpeg = np.expand_dims(np.expand_dims(JPEG_STANDARD_Q, 0), 0).astype(np.float64)
     nikon = np.expand_dims(np.expand_dims(NIKON_COOLPIX_L12, 0), 0).astype(np.float64)

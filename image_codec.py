@@ -1,6 +1,4 @@
-from PIL import Image
 from scipy.fftpack import *
-import numpy as np
 from utility import *
 
 
@@ -36,16 +34,8 @@ def psnr(arr_a, arr_b, max_possible=255.0):
     return 20 * np.math.log10(max_possible) - 10 * np.log10(np.mean((np.asarray(arr_a, np.float64) - np.asarray(arr_b, np.float64)) ** 2 + np.asarray((1e-10,)), axis=(0, 1)))
 
 
-def image2arr(image, scale=255) -> np.ndarray:
-    return np.asarray(image, dtype=np.float64) / scale
-
-
-def arr2image(arr: np.ndarray, scale: float = 255) -> Image:
-    return Image.fromarray(np.asarray(arr * (scale,)).astype(np.int8), "L")
-
-
 def image_codec_main():
-    output_path = "./output/image_codec"
+    output_path = "./lab1_output/image_codec"
     clean_folder(output_path)
     lena = Image.open("lena.bmp")
     gray_scale_lena_arr = np.mean(image2arr(lena), axis=-1)
@@ -71,7 +61,7 @@ def test_dct1d(scale, arr, output_path):
     h, w = int(np.size(dct1d_cft, 0) / scale), int(np.size(dct1d_cft, 1) / scale)
     dct1d_cft *= zig_zag_selector(h * w, np.size(arr, 0), np.size(arr, 1))
 
-    Image.fromarray(dct1d_cft.astype(np.int8), "L").save(os.path.join(output_path, "dct1d_cft_lena_%d.bmp" % scale))
+    Image.fromarray(np.asarray(dct1d_cft * (10,)).astype(np.int8), "L").save(os.path.join(output_path, "dct1d_cft_lena_%d.bmp" % scale))
     idct1d_lena = arr2image(idct1d_codec(dct1d_cft))
     idct1d_lena.save(os.path.join(output_path, "idct1d_lena_%d.bmp") % scale)
     print("PSNR of 1D DCT codec: %fdB" % psnr(arr * 255, np.asarray(idct1d_lena)), ", use 1/%d DCT coefficients" % scale ** 2)
@@ -88,7 +78,7 @@ def test_dct2d(scale, arr, output_path, block_size=(0, 0)):
     dct2d_cft_blocks *= np.expand_dims(np.expand_dims(zig_zag_selector(h * w, block_size[0], block_size[1]), 0), 0)
     dct2d_cft = block_join(dct2d_cft_blocks)
 
-    Image.fromarray((dct2d_cft + 100).astype(np.int8), "L").save(os.path.join(output_path, "dct2d_cft_lena_%d_%d_%d.bmp") % (block_size + (scale, )))
+    Image.fromarray(np.asarray(dct2d_cft * (10,)).astype(np.int8), "L").save(os.path.join(output_path, "dct2d_cft_lena_%d_%d_%d.bmp") % (block_size + (scale,)))
     idct2d_lena = arr2image(idct2d_codec(dct2d_cft, block_size))
     idct2d_lena.save(os.path.join(output_path, "idct2d_lena_%d_%d_%d.bmp") % (block_size[0], block_size[1], scale))
     print("PSNR of 2D DCT codec: %fdB, block size: %d, %d" % (psnr(arr * 255, np.asarray(idct2d_lena)), block_size[0], block_size[1]), ", use 1/%d DCT coefficients" % scale ** 2)
