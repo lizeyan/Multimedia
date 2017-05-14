@@ -34,7 +34,7 @@ def cli_lab2():
     for x, func_distance in enumerate(func_distance_options):
         for y, bins in enumerate(bins_options):
             cmd = "python image_retrieval.py -q QueryImages.txt -s %d %d %d " % bins + " -f %s " % func_distance
-            while active_count == MAX_WORKER:
+            while active_count == FLAGS.max_worker:
                 time.sleep(1)
                 for idx, child in enumerate(children):
                     if is_running[idx] and child.poll() is not None:
@@ -69,8 +69,8 @@ def cli_lab2():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="full work flow for lab2")
     parser.add_argument("--gui", "-g", help="use GUI or CLI")
+    parser.add_argument("--max_worker", "-j", help="maximum number of process to be used", default=4, type=int)
     FLAGS = parser.parse_args()
-    MAX_WORKER = 4
     if FLAGS.gui is not None:
         gui_lab2()
     else:

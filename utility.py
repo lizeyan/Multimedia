@@ -107,7 +107,7 @@ def arr2image(arr: np.ndarray, scale: float = 255) -> Image:
 
 
 def euclidean_distance(x: np.ndarray, y: np.ndarray, axis=-1) -> np.ndarray:
-    return np.mean((x - y) ** 2, axis=axis)
+    return np.mean(np.sqrt((x - y) ** 2), axis=axis)
 
 
 def histogram_intersection(x: np.ndarray, y: np.ndarray, axis=-1) -> np.ndarray:
@@ -118,10 +118,39 @@ def bhattacharyya(x: np.ndarray, y: np.ndarray, axis=-1) -> np.ndarray:
     return np.sqrt(1 - np.sum(np.sqrt(x * y), axis=axis))
 
 
+def manhattan_distance(x: np.ndarray, y: np.ndarray, axis=-1) -> np.ndarray:
+    return np.mean(np.abs(x - y), axis=axis)
+
+
+def chebyshev_distance(x: np.ndarray, y: np.ndarray, axis=-1) -> np.ndarray:
+    return np.max(np.abs(x - y), axis=axis)
+
+
+def cosine_distance(_x: np.ndarray, _y: np.ndarray, axis=-1) -> np.ndarray:
+    x = _x + np.min(_x)
+    y = _y + np.min(_y)
+    return np.sum(x * y, axis=axis) / np.sqrt((np.sum(x * x, axis=axis) * np.sum(y * y, axis=axis)))
+
+
+def chi_square_distance(x: np.ndarray, y: np.ndarray, axis=-1) -> np.ndarray:
+    _x = x + np.min(x)
+    _y = y + np.min(y)
+    return np.mean((_x - _y) ** 2 / (_x + _y + EPS), axis=axis)
+
+
+def jffreys_distance(x: np.ndarray, y: np.ndarray, axis=-1) -> np.ndarray:
+    return np.sqrt(np.sum((np.sqrt(x + np.min(x)) - np.sqrt(y + np.min(y))) ** 2, axis=axis))
+
+
 name2func_distance = {
+    "l1": manhattan_distance,
     "l2": euclidean_distance,
+    "chb": chebyshev_distance,
     "hi": histogram_intersection,
     "bh": bhattacharyya,
+    "cos": cosine_distance,
+    "ca": chi_square_distance,
+    "jf": jffreys_distance,
 }
 
 
