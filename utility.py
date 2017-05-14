@@ -9,8 +9,8 @@ from shutil import *
 EPS = 1e-15
 
 
-def log(msg, *args, **kwargs):
-    print("[%s]" % str(datetime.now())[:-7], msg, *args, **kwargs)
+def log(*args, **kwargs):
+    print("[%s]" % str(datetime.now())[:-7], *args, **kwargs)
 
 
 def profile(func):
@@ -106,8 +106,27 @@ def arr2image(arr: np.ndarray, scale: float = 255) -> Image:
     return Image.fromarray(np.asarray(arr * (scale,)).astype(np.int8), "L")
 
 
-def euclidean_distance(x, y, axis=-1):
+def euclidean_distance(x: np.ndarray, y: np.ndarray, axis=-1) -> np.ndarray:
     return np.mean((x - y) ** 2, axis=axis)
+
+
+def histogram_intersection(x: np.ndarray, y: np.ndarray, axis=-1) -> np.ndarray:
+    return 1 - np.sum(np.min([x - y + y, y - x + x], axis=0), axis=axis) / np.sum(y - x + x, axis=axis)
+
+
+def bhattacharyya(x: np.ndarray, y: np.ndarray, axis=-1) -> np.ndarray:
+    return np.sqrt(1 - np.sum(np.sqrt(x * y), axis=axis))
+
+
+name2func_distance = {
+    "l2": euclidean_distance,
+    "hi": histogram_intersection,
+    "bh": bhattacharyya,
+}
+
+
+def normalize(arr, axis=-1):
+    return arr / np.expand_dims(np.sum(arr, axis=axis), axis=axis)
 
 
 if __name__ == '__main__':

@@ -5,6 +5,6 @@ AllImages.txt
 QueryImages.txt
 lab1_output/
 lab2_output/
-*.avi
 DataSet/
 __pycache__/
+lab2_result.csv
