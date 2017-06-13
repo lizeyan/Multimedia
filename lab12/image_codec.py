@@ -40,7 +40,7 @@ def idct2d_codec(arr, block_size) -> np.ndarray:
 
 
 def psnr(arr_a, arr_b, max_possible=255.0):
-    return 20 * np.math.log10(max_possible) - 10 * np.log10(np.mean((arr_a.astype(np.float64) - arr_b.astype(np.float64)) ** 2 + (EPS,), axis=(0, 1)))
+    return 20 * np.math.log10(max_possible) - 10 * np.log10(np.mean((arr_a.astype(np.float64) - arr_b.astype(np.float64)) ** 2 + (EPS,), axis=(-2, -1)))
 
 
 def image_codec_main():
@@ -96,4 +96,6 @@ def test_dct2d(scale, arr, output_path, block_size=(0, 0)):
 
 
 if __name__ == '__main__':
+    tic()
     image_codec_main()
+    toc()

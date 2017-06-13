@@ -1,36 +1,45 @@
+from matplotlib import pyplot as plt
+from matplotlib import patches as patches
 import av
 from utility import *
 from image_codec import *
-from copy import deepcopy
 
 
-def index_min_error(a, b, mask, func_error):
-    error = func_error(a * mask, b * mask)
+def index_min_error(a, b, func_error):
+    error = func_error(a, b)
     return np.unravel_index(np.argmin(error), error.shape)
 
 
-def threshold_count_error(a, b, axis=None):
+def threshold_count_error(a, b, threshold=1e-2, axis=None):
     x = np.abs(a - b)
-    threshold = np.median(x)
-    return (x > threshold).sum(axis)
+    return (x > threshold).sum(axis) / np.size(x)
+
+
+def center_weight_mse_error(a, b, mask, weight, axis=None):
+    error = np.square(np.expand_dims(np.expand_dims(a, 0), 0) - b) * np.expand_dims(mask, -1)
+    center = error * np.expand_dims(center_selector(1/4, np.size(a, -3), np.size(a, -2)), -1)
+    return np.mean(error + center * (weight - 1.0), axis=axis)
+
+
+def center_weight_time_domain_block_matching(reference_block: np.ndarray, image_arr: np.ndarray, mask: np.ndarray, weight=1.0):
+    sliding = np.rollaxis(sliding_window(np.rollaxis(image_arr, -1, 0), BLOCK_SIZE), 0, np.ndim(image_arr) + len(BLOCK_SIZE))
+    return index_min_error(reference_block, sliding, lambda a, b: center_weight_mse_error(a, b, mask, weight, axis=(-1, -2, -3)))
+
+
+def counter_time_domain_block_matching(reference_block: np.ndarray, image_arr: np.ndarray, threshold=1e-2):
+    sliding = np.rollaxis(sliding_window(np.rollaxis(image_arr, -1, 0), BLOCK_SIZE), 0, np.ndim(image_arr) + len(BLOCK_SIZE))
+    return index_min_error(reference_block, sliding, lambda a, b: threshold_count_error(np.expand_dims(np.expand_dims(a, 0), 0), b, threshold, (-3, -2, -1)))
 
 
 def time_domain_block_matching(reference_block: np.ndarray, image_arr: np.ndarray, mask: np.ndarray):
-    sliding = np.concatenate(list(np.expand_dims(sliding_window(image_arr[:, :, i], BLOCK_SIZE), -1) for i in range(3)), axis=-1)
-    if isinstance(mask, int):
-        mask = random_selector(mask, BLOCK_SIZE[0], BLOCK_SIZE[1])
-    mask = np.expand_dims(mask, -1)
-    # return index_min_error(reference_block, sliding, mask, lambda a, b: np.mean(np.square(np.expand_dims(np.expand_dims(a, 0), 0) - b), axis=(-1, -2, -3)))
-    return index_min_error(reference_block, sliding, mask, lambda a, b: threshold_count_error(np.expand_dims(np.expand_dims(a, 0), 0), b, (2, 3, 4)))
+    sliding = np.rollaxis(sliding_window(np.rollaxis(image_arr, -1, 0), BLOCK_SIZE), 0, np.ndim(image_arr) + len(BLOCK_SIZE))
+    return index_min_error(reference_block, sliding, lambda a, b: np.mean(np.square(np.expand_dims(np.expand_dims(a, 0), 0) - b) * np.expand_dims(mask, -1), axis=(-1, -2, -3)))
 
 
 def frequency_domain_block_matching(reference_block: np.ndarray, image_arr: np.ndarray, mask: np.ndarray):
-    sliding = np.concatenate(list(np.expand_dims(sliding_window(image_arr[:, :, i], BLOCK_SIZE), -1) for i in range(3)), axis=-1)
+    sliding = np.rollaxis(sliding_window(np.rollaxis(image_arr, -1, 0), BLOCK_SIZE), 0, np.ndim(image_arr) + len(BLOCK_SIZE))
     dct_sliding = np.rollaxis(dct2(np.rollaxis(sliding, -1, 0)), 0, np.ndim(sliding))
-    if isinstance(mask, int):
-        mask = random_selector(mask, BLOCK_SIZE[0], BLOCK_SIZE[1])
-    mask = np.expand_dims(mask, -1)
-    return index_min_error(reference_block, dct_sliding, mask, lambda a, b: np.mean(np.square(np.expand_dims(np.expand_dims(a, 0), 0) - b), axis=(-1, -2, -3)))
+    return index_min_error(reference_block, dct_sliding, lambda a, b: np.mean(np.square(np.expand_dims(np.expand_dims(a, 0), 0) - b) * np.expand_dims(mask, -1), axis=(-1, -2, -3)))
 
 
 def image2arr_pair_iterator(image_list: list, *args, **kwargs):
@@ -71,9 +80,8 @@ def get_block(arr, block_pos):
 
 
 def main():
-    clean_folder(PATH_OUTPUT)
     video_container = av.open(PATH_TO_VIDEO)
-    max_frame_number = 40
+    max_frame_number = 45
     image_list = list([f.to_image() for f in video_container.decode(video=0)])
     log("video %s decoded" % PATH_TO_VIDEO)
     image_arr_list = list([image2arr(item) for item in image_list[:max_frame_number]])
@@ -82,45 +90,60 @@ def main():
     reference_block = get_block(image2arr(image_list[0]), init_block_pos)
     dct_reference_block = np.rollaxis(dct2(np.rollaxis(reference_block, -1, 0)), 0, np.ndim(reference_block))
 
-    def work_motion_estimation(estimation_func, path_video_output):
-        __output_image_arr_list = []
+    def work_motion_estimation(estimation_func, indicator):
+        frames_output_path = os.path.join(PATH_OUTPUT, indicator)
+        clean_folder(frames_output_path)
         __error_list = []
-        for idx, __image_arr_origin in enumerate(image_arr_list):
-            __image_arr = __image_arr_origin.copy()
-            __block_pos = estimation_func(__image_arr)
-            log("frame number: %d, block pos: (%d, %d)" % (idx + 1, __block_pos[0], __block_pos[1]))
-            __bounding_box = bounding_box_points(__block_pos, BLOCK_SIZE)
-            __error_list.append([np.mean(np.square(get_block(__image_arr, __block_pos), reference_block))])
-            __image_arr[__bounding_box[:, 0], __bounding_box[:, 1]] = np.array([1, 0, 0])
-            __output_image_arr_list.append((__image_arr * 255).astype(np.uint8))
-        log("constructing video")
-        output = av.open(os.path.join(PATH_OUTPUT, path_video_output), 'w')
+        output = av.open(os.path.join(PATH_OUTPUT, indicator + ".mp4"), 'w')
         stream = output.add_stream("mpeg4", "10")
         stream.pix_fmt = "yuv420p"
-        for img in __output_image_arr_list:
-            frame = av.VideoFrame.from_ndarray(array=img, format='rgb24')
+        __last_pos = init_block_pos
+        for idx, __image_arr in enumerate(image_arr_list):
+            __block_pos = estimation_func(__image_arr)
+            log("[%s]" % indicator, "frame number: %d, block pos: (%d, %d)" % (idx + 1, __block_pos[0], __block_pos[1]))
+            __error_list.append([np.mean(np.square(get_block(__image_arr, __block_pos) - reference_block))])
+
+            # plot
+            fig = plt.figure()
+            ax = plt.Axes(fig, [0., 0., 1., 1.])
+            ax.set_axis_off()
+            fig.add_axes(ax)
+            ax.imshow(__image_arr, cmap=plt.get_cmap("bone"))
+            ax.add_patch(patches.Rectangle((__block_pos[1], __block_pos[0]), BLOCK_SIZE[0], BLOCK_SIZE[1], fill=None, color="g"))
+            ax.arrow(__last_pos[1], __last_pos[0], __block_pos[1] - __last_pos[1], __block_pos[0] - __last_pos[0], fc='k', ec='k')
+            plt.annotate('', xy=(init_block_pos[1], init_block_pos[0]), xycoords='data', xytext=(__block_pos[1], __block_pos[0]), textcoords='data', arrowprops={'arrowstyle': '<-', "color": "r"})
+            __last_pos = __block_pos
+            fig.canvas.draw()
+            image_arr_new = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+            image_arr_new = image_arr_new.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+            Image.fromarray(image_arr_new, "RGB").save(os.path.join(frames_output_path, "%d.jpg" % (idx + 1)))
+            plt.close(fig)
+            # to video
+            frame = av.VideoFrame.from_ndarray(array=image_arr_new, format='rgb24')
             packet = stream.encode(frame)
             output.mux(packet)
         output.close()
-        return __error_list
+        plt.clf()
+        plt.plot(np.arange(1, len(image_arr_list) + 1), __error_list)
+        plt.title("%s-MSE" % indicator)
+        plt.xlabel("frame number")
+        plt.ylabel("MSE")
+        plt.savefig(os.path.join(PATH_OUTPUT, "%s_MSE-frame_number.png" % indicator))
+        log("[%s]" % indicator, "Average MSE:", np.mean(__error_list))
 
-    error_list = work_motion_estimation(lambda x: time_domain_block_matching(reference_block, x, np.ones(BLOCK_SIZE)), "time_domain.mp4")
-    print("MSE: ", np.mean(error_list))
-    error_list = work_motion_estimation(lambda x: time_domain_block_matching(reference_block, x, random_selector(2, BLOCK_SIZE[0], BLOCK_SIZE[1])), "time_domain_random_4.mp4")
-    print("MSE: ", np.mean(error_list))
-    error_list = work_motion_estimation(lambda x: time_domain_block_matching(reference_block, x, random_selector(4, BLOCK_SIZE[0], BLOCK_SIZE[1])), "time_domain_random_16.mp4")
-    print("MSE: ", np.mean(error_list))
-    error_list = work_motion_estimation(lambda x: time_domain_block_matching(reference_block, x, random_selector(8, BLOCK_SIZE[0], BLOCK_SIZE[1])), "time_domain_random_64.mp4")
-    print("MSE: ", np.mean(error_list))
-
-    error_list = work_motion_estimation(lambda x: frequency_domain_block_matching(dct_reference_block, x, np.ones(BLOCK_SIZE)), "frequency_domain.mp4")
-    print("MSE: ", np.mean(error_list))
-    error_list = work_motion_estimation(lambda x: frequency_domain_block_matching(dct_reference_block, x, zig_zag_selector(int(BLOCK_SIZE[0] * BLOCK_SIZE[1] / 4), BLOCK_SIZE[0], BLOCK_SIZE[1])), "frequency_domain_zig_zag_4.mp4")
-    print("MSE: ", np.mean(error_list))
-    error_list = work_motion_estimation(lambda x: frequency_domain_block_matching(dct_reference_block, x, zig_zag_selector(int(BLOCK_SIZE[0] * BLOCK_SIZE[1] / 16), BLOCK_SIZE[0], BLOCK_SIZE[1])), "frequency_domain_zig_zag_16.mp4")
-    print("MSE: ", np.mean(error_list))
-    error_list = work_motion_estimation(lambda x: frequency_domain_block_matching(dct_reference_block, x, zig_zag_selector(int(BLOCK_SIZE[0] * BLOCK_SIZE[1] / 64), BLOCK_SIZE[0], BLOCK_SIZE[1])), "frequency_domain_zig_zag_64.mp4")
-    print("MSE: ", np.mean(error_list))
+    work_motion_estimation(lambda x: center_weight_time_domain_block_matching(reference_block, x, center_selector(1/2, BLOCK_SIZE[0], BLOCK_SIZE[1]), 8), "center_weight_8")
+    work_motion_estimation(lambda x: center_weight_time_domain_block_matching(reference_block, x, center_selector(1/2, BLOCK_SIZE[0], BLOCK_SIZE[1]), 2), "center_weight_2")
+    work_motion_estimation(lambda x: center_weight_time_domain_block_matching(reference_block, x, center_selector(1/2, BLOCK_SIZE[0], BLOCK_SIZE[1]), 4), "center_weight_4")
+    work_motion_estimation(lambda x: counter_time_domain_block_matching(reference_block, x, 1e-1), "counter_1e-1")
+    work_motion_estimation(lambda x: counter_time_domain_block_matching(reference_block, x, 1e-2), "counter_1e-2")
+    work_motion_estimation(lambda x: time_domain_block_matching(reference_block, x, np.ones(BLOCK_SIZE)), "time_domain")
+    work_motion_estimation(lambda x: time_domain_block_matching(reference_block, x, center_selector(1/2, BLOCK_SIZE[0], BLOCK_SIZE[1])), "time_domain_1_4")
+    work_motion_estimation(lambda x: time_domain_block_matching(reference_block, x, center_selector(1/4, BLOCK_SIZE[0], BLOCK_SIZE[1])), "time_domain_1_16")
+    work_motion_estimation(lambda x: time_domain_block_matching(reference_block, x, center_selector(1/8, BLOCK_SIZE[0], BLOCK_SIZE[1])), "time_domain_1_64")
+    work_motion_estimation(lambda x: frequency_domain_block_matching(dct_reference_block, x, np.ones(BLOCK_SIZE)), "frequency_domain")
+    work_motion_estimation(lambda x: frequency_domain_block_matching(dct_reference_block, x, zig_zag_selector(int(BLOCK_SIZE[0] * BLOCK_SIZE[1] / 4), BLOCK_SIZE[0], BLOCK_SIZE[1])), "frequency_domain_zig_zag_4")
+    work_motion_estimation(lambda x: frequency_domain_block_matching(dct_reference_block, x, zig_zag_selector(int(BLOCK_SIZE[0] * BLOCK_SIZE[1] / 16), BLOCK_SIZE[0], BLOCK_SIZE[1])), "frequency_domain_zig_zag_16")
+    work_motion_estimation(lambda x: frequency_domain_block_matching(dct_reference_block, x, zig_zag_selector(int(BLOCK_SIZE[0] * BLOCK_SIZE[1] / 64), BLOCK_SIZE[0], BLOCK_SIZE[1])), "frequency_domain_zig_zag_64")
 
 
 if __name__ == '__main__':

@@ -48,8 +48,8 @@ MY_Q = np.asarray([
 
 
 def main():
-    work("lena.bmp")
     work("shana.jpg")
+    work("lena.bmp")
 
 
 def work(path):

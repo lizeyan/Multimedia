@@ -5,8 +5,22 @@ from numpy.lib.stride_tricks import as_strided
 import time
 from datetime import datetime
 from shutil import *
+from numba import *
 
 EPS = 1e-15
+
+__last_tic = None
+
+
+def tic():
+    global __last_tic
+    __last_tic = time.time()
+
+
+def toc():
+    global __last_tic
+    print("elapsed time: %f s" % (time.time() - __last_tic))
+    __last_tic = None
 
 
 def log(*args, **kwargs):
@@ -27,8 +41,8 @@ def blockwise(matrix, block=(3, 3)):
 
 
 def sliding_window(matrix, block, step=(1, 1)):
-    shape = (int((matrix.shape[0] - block[0]) / step[0] + 1), int((matrix.shape[1] - block[1]) / step[1] + 1)) + block
-    strides = (matrix.strides[0] * step[0], matrix.strides[1] * step[1]) + matrix.strides
+    shape = matrix.shape[:-2] + (int((matrix.shape[-2] - block[0]) / step[0] + 1), int((matrix.shape[-1] - block[1]) / step[1] + 1)) + block
+    strides = matrix.strides[:-2] + (matrix.strides[-2] * step[0], matrix.strides[-1] * step[1]) + matrix.strides[-2:]
     return as_strided(matrix, shape=shape, strides=strides)
 
 
@@ -45,19 +59,38 @@ def clean_folder(path):
         os.makedirs(path)
 
 
-def block_join(blocks):
-    return np.vstack(map(np.hstack, blocks))
+def block_join(_blocks):
+    blocks = np.rollaxis(_blocks, -1)
+    for _ in range(3):
+        blocks = np.rollaxis(blocks, -1)
+    joined = np.vstack(map(np.hstack, blocks))
+    for _ in range(2):
+        joined = np.rollaxis(joined, 0, np.ndim(_blocks) - 2)
+    return joined
 
 
 def _test_block():
-    a = np.arange(6 * 6).reshape((6, 6))
-    print(a)
-    print(sliding_window(a, (4, 4), (1, 3)))
-    arr = np.arange(36).reshape((6, 6))
-    blocks = blockwise(arr, (3, 3))
-    print(blocks)
-    re_join = block_join(blocks)
-    print(re_join)
+    # a = np.arange(6 * 6).reshape((6, 6))
+    # print(a)
+    # print(sliding_window(a, (4, 4), (1, 3)))
+    # arr = np.arange(36).reshape((6, 6))
+    # blocks = blockwise(arr, (3, 3))
+    # print(blocks)
+    # re_join = block_join(blocks)
+    # print(re_join)
+    # print(center_selector(6/8, 8, 8))
+    # print(center_selector(4/8, 8, 8))
+    # print(center_selector(2/8, 8, 8))
+    n = 25, 15
+    w = 1024
+    h = 512
+    a = np.random.randn(*n, w, h)
+    print("a.shape", a.shape)
+    b = blockwise(a, (8, 8))
+    print("b.shape", b.shape)
+    a1 = block_join(b)
+    print("a1.shape", a1.shape)
+    assert np.max(np.abs(a1 - a)) == 0
 
 
 def left_top_corner_selector(r, c, ar, ac):
@@ -106,6 +139,16 @@ def random_selector(scale, rows, columns):
     idx_block = np.unravel_index(np.arange(br * bc), (br, bc))
     result[idx_block[0], idx_block[1], idx_each_block[0], idx_each_block[1]] = 1
     return block_join(result)
+
+
+def center_selector(scale, rows, columns):
+    side = (1.0 - scale) / 2
+    result = np.ones((rows, columns))
+    result[:int(rows * side), :] = 0
+    result[-int(rows * side):, :] = 0
+    result[:, :int(columns * side)] = 0
+    result[:, -int(columns * side):] = 0
+    return result
 
 
 def _test_zig_zag_selector():
@@ -178,6 +221,30 @@ def normalize(arr, axis=-1):
     return arr / np.expand_dims(np.sum(arr, axis=axis), axis=axis)
 
 
+@vectorize
+def add_jit(a, b):
+    return a + b
+
+
+def add(a, b):
+    return a + b
+
+
+def test_jit():
+    a = np.random.randn(100, 100, 100)
+    b = np.random.randn(100, 100, 100)
+    tic()
+    for i in range(100):
+        add_jit(a, b)
+    toc()
+    tic()
+    for i in range(100):
+        add(a, b)
+    toc()
+
+
 if __name__ == '__main__':
+    # ignore me
     _test_block()
+    # test_jit()
     # _test_zig_zag_selector()

@@ -184,7 +184,9 @@ PSNR为50.4958dB,和原图基本完全相同.
 
 考虑到调用scipy.fftpack,复杂度会进一步降低,大致为$O(n^2logn)$
 
-### 2D on 8*8 block
+
+#### 2D on 8*8 block
+
 
 定义式中,每一个块需要$O(8^4)$的复杂度,总共有$(\frac{n}{8})^2$个块,因此复杂度为$O(n^2)$
 
@@ -324,7 +326,14 @@ python3 image_codec.py
   $$
 
 
+
+
+
 ### 实验结果与分析
+
+#### 每一块的PSNR
+
+每一个块的PSNR输出到了*lab1_output/quantization/lena_bmp*和*lab1_output/quantization/shana_bmp*中
 
 #### 原图和测试图使用不同量化矩阵的PSNR
 
@@ -368,4 +377,219 @@ python3 quantization.py
 - 需要不超过10min的运行时间
 
 ## Motion Estimation and Compensation
+
+## 实验原理
+
+motion estimation指的是从视频中分析运动.block matching指的是通过将参考块和后续帧中的块进行比较,寻找误差最小的块作为移动到的位置的方法.
+
+pixel domain就是直接将参考块和后续帧的每一块计算MSE,寻找MSE最小的块.
+
+compression domain(frequency domain)就是将参考块做DCT,将DCT系数和后续帧的每一块的DCT系数做对比.
+
+## 实验结果
+
+实验中使用的全图块匹配.选取的参考块是第一帧左上角的一个区域，坐标为(48,108):
+
+![reference_block](../lab1_output/motion_estimation/time_domain/1.jpg)
+
+我在视频的1-45帧中分析参考快的运动，45帧之后画面中就没有这辆车了。
+
+我将Motion Vector和计算出的参考块移动到的位置绘制为一系列图片和视频，在提交文件中的*lab1_output/motion_estimation/*中。为了便于观看,视频的帧率比较小.之后在报告中将只展示图片.图片中绿色方框表示算法得出的参考块移动到的位置,红色箭头表示他从初始位置到当前位置的移动,黑色箭头表示从上一帧到当前帧的移动(一般都很小,不容易看清).
+
+实验中计算MSE的时候图片中颜色的取值范围是$[0,1)$而不是$[0, 255)$,因此MSE比之前exp1,exp2中出现的MSE都要小得多,它们之前是不能直接比较的.
+
+eg.:
+
+![example](../lab1_output/motion_estimation/time_domain/30.jpg)
+
+### pixel domain
+
+#### all
+
+![mse_frame](../lab1_output/motion_estimation/time_domain_MSE-frame_number.png)
+
+| frame | 10                                       | 20                                       | 30                                       | 40                                       |
+| ----- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| image | ![frame10](../lab1_output/motion_estimation/time_domain/10.jpg) | ![frame20](../lab1_output/motion_estimation/time_domain/20.jpg) | ![frame30](../lab1_output/motion_estimation/time_domain/30.jpg) | ![frame40](../lab1_output/motion_estimation/time_domain/40.jpg) |
+
+#### 1/4
+
+![mse_frame](../lab1_output/motion_estimation/time_domain_1_4_MSE-frame_number.png)
+
+| frame | 10                                       | 20                                       | 30                                       | 40                                       |
+| ----- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| image | ![frame10](../lab1_output/motion_estimation/time_domain_1_4/10.jpg) | ![frame20](../lab1_output/motion_estimation/time_domain_1_4/20.jpg) | ![frame30](../lab1_output/motion_estimation/time_domain_1_4/30.jpg) | ![frame40](../lab1_output/motion_estimation/time_domain_1_4/40.jpg) |
+
+
+
+#### 1/16
+
+![mse_frame](../lab1_output/motion_estimation/time_domain_1_16_MSE-frame_number.png)
+
+| frame | 10                                       | 20                                       | 30                                       | 40                                       |
+| ----- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| image | ![frame10](../lab1_output/motion_estimation/time_domain_1_16/10.jpg) | ![frame20](../lab1_output/motion_estimation/time_domain_1_16/20.jpg) | ![frame30](../lab1_output/motion_estimation/time_domain_1_16/30.jpg) | ![frame40](../lab1_output/motion_estimation/time_domain_1_16/40.jpg) |
+
+#### 1/64
+
+![mse_frame](../lab1_output/motion_estimation/time_domain_1_64_MSE-frame_number.png)
+
+| frame | 10                                       | 20                                       | 30                                       | 40                                       |
+| ----- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| image | ![frame10](../lab1_output/motion_estimation/time_domain_1_64/10.jpg) | ![frame20](../lab1_output/motion_estimation/time_domain_1_64/20.jpg) | ![frame30](../lab1_output/motion_estimation/time_domain_1_64/30.jpg) | ![frame40](../lab1_output/motion_estimation/time_domain_1_64/40.jpg) |
+
+### frequency domain
+
+#### all
+
+![mse_frame](../lab1_output/motion_estimation/frequency_domain_MSE-frame_number.png)
+
+| frame | 10                                       | 20                                       | 30                                       | 40                                       |
+| ----- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| image | ![frame10](../lab1_output/motion_estimation/frequency_domain/10.jpg) | ![frame20](../lab1_output/motion_estimation/frequency_domain/20.jpg) | ![frame30](../lab1_output/motion_estimation/frequency_domain/30.jpg) | ![frame40](../lab1_output/motion_estimation/frequency_domain/40.jpg) |
+
+#### 1/4
+
+![mse_frame](../lab1_output/motion_estimation/frequency_domain_zig_zag_4_MSE-frame_number.png)
+
+| frame | 10                                       | 20                                       | 30                                       | 40                                       |
+| ----- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| image | ![frame10](../lab1_output/motion_estimation/frequency_domain_zig_zag_4/10.jpg) | ![frame20](../lab1_output/motion_estimation/frequency_domain_zig_zag_4/20.jpg) | ![frame30](../lab1_output/motion_estimation/frequency_domain_zig_zag_4/30.jpg) | ![frame40](../lab1_output/motion_estimation/frequency_domain_zig_zag_4/40.jpg) |
+
+#### 1/16
+
+![mse_frame](../lab1_output/motion_estimation/frequency_domain_zig_zag_16_MSE-frame_number.png)
+
+| frame | 10                                       | 20                                       | 30                                       | 40                                       |
+| ----- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| image | ![frame10](../lab1_output/motion_estimation/frequency_domain_zig_zag_16/10.jpg) | ![frame20](../lab1_output/motion_estimation/frequency_domain_zig_zag_16/20.jpg) | ![frame30](../lab1_output/motion_estimation/frequency_domain_zig_zag_16/30.jpg) | ![frame40](../lab1_output/motion_estimation/frequency_domain_zig_zag_16/40.jpg) |
+
+#### 1/64
+
+![mse_frame](../lab1_output/motion_estimation/frequency_domain_zig_zag_64_MSE-frame_number.png)
+
+| frame | 10                                       | 20                                       | 30                                       | 40                                       |
+| ----- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| image | ![frame10](../lab1_output/motion_estimation/frequency_domain_zig_zag_64/10.jpg) | ![frame20](../lab1_output/motion_estimation/frequency_domain_zig_zag_64/20.jpg) | ![frame30](../lab1_output/motion_estimation/frequency_domain_zig_zag_64/30.jpg) | ![frame40](../lab1_output/motion_estimation/frequency_domain_zig_zag_64/40.jpg) |
+
+## 分析
+
+### 使用一部分DCT系数
+
+正如之前exp1的分析,图片内容的主要部分是低频部分,也就是DCT系数矩阵的左上角的部分,因此选取一部分DCT系数的时候还是使用zig-zag顺序.
+
+我们看一下使用不同DCT系数的视频的效果对比:
+
+|      | average MSE     | 10                                       | 20                                       | 30                                       | 40                                       |
+| ---- | --------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| all  | 0.0077588178336 | ![frame10](../lab1_output/motion_estimation/frequency_domain/10.jpg) | ![frame20](../lab1_output/motion_estimation/frequency_domain/20.jpg) | ![frame30](../lab1_output/motion_estimation/frequency_domain/30.jpg) | ![frame40](../lab1_output/motion_estimation/frequency_domain/40.jpg) |
+| 1/4  | 0.0077682039137 | ![frame10](../lab1_output/motion_estimation/frequency_domain_zig_zag_4/10.jpg) | ![frame20](../lab1_output/motion_estimation/frequency_domain_zig_zag_4/20.jpg) | ![frame30](../lab1_output/motion_estimation/frequency_domain_zig_zag_4/30.jpg) | ![frame40](../lab1_output/motion_estimation/frequency_domain_zig_zag_4/40.jpg) |
+| 1/16 | 0.0093794298311 | ![frame10](../lab1_output/motion_estimation/frequency_domain_zig_zag_16/10.jpg) | ![frame20](../lab1_output/motion_estimation/frequency_domain_zig_zag_16/20.jpg) | ![frame30](../lab1_output/motion_estimation/frequency_domain_zig_zag_16/30.jpg) | ![frame40](../lab1_output/motion_estimation/frequency_domain_zig_zag_16/40.jpg) |
+| 1/64 | 0.0161975308642 | ![frame10](../lab1_output/motion_estimation/frequency_domain_zig_zag_64/10.jpg) | ![frame20](../lab1_output/motion_estimation/frequency_domain_zig_zag_64/20.jpg) | ![frame30](../lab1_output/motion_estimation/frequency_domain_zig_zag_64/30.jpg) | ![frame40](../lab1_output/motion_estimation/frequency_domain_zig_zag_64/40.jpg) |
+
+随着使用越来越少的DCT系数,MSE在渐渐增大,但是增加的非常缓慢,即使只是用1/64的DCT系数最后的MSE也仍然很小(对应的PSNR为17dB).
+
+从我们的目标-运动估计的角度来看,使用1/64的DCT系数的结果是非常准确的,从上面的表格以及视频中都可以看出来,绿色方框非常准确地追踪了这辆车的移动.
+
+我们可以看一下参考块的R分量的DCT系数矩阵(G,B也是类似的):
+
+![dct](exp3_dct.png)
+
+因为左上角的一个值远远大于剩下的所有值,所以选取1/64的值是足够表达这个矩阵的主要特征的.
+
+### 使用一部分raw pixels
+
+一般来说,一个图片的主要部分应该是在图片的中间.因此如果要选取一部分像素点,选取最中央的像素点应该是合理的选择.不过和上面选取DCT系数的理由相比,中间的图片内容更加重要是没有那么确定的,我们可以举出有很多例子,图片的重点信息都不在正中央.
+
+在这个实验中,参考块是人为选取的,我们可以人为地让车的主体尽量集中在参考块的正中央.
+
+|      | average MSE     | 10                                       | 20                                       | 30                                       | 40                                       |
+| ---- | --------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| all  | 0.0077588178336 | ![frame10](../lab1_output/motion_estimation/time_domain/10.jpg) | ![frame20](../lab1_output/motion_estimation/time_domain/20.jpg) | ![frame30](../lab1_output/motion_estimation/time_domain/30.jpg) | ![frame40](../lab1_output/motion_estimation/time_domain/40.jpg) |
+| 1/4  | 0.0155073435965 | ![frame10](../lab1_output/motion_estimation/time_domain_1_4/10.jpg) | ![frame20](../lab1_output/motion_estimation/time_domain_1_4/20.jpg) | ![frame30](../lab1_output/motion_estimation/time_domain_1_4/30.jpg) | ![frame40](../lab1_output/motion_estimation/time_domain_1_4/40.jpg) |
+| 1/16 | 0.0155819810223 | ![frame10](../lab1_output/motion_estimation/time_domain_1_16/10.jpg) | ![frame20](../lab1_output/motion_estimation/time_domain_1_16/20.jpg) | ![frame30](../lab1_output/motion_estimation/time_domain_1_16/30.jpg) | ![frame40](../lab1_output/motion_estimation/time_domain_1_16/40.jpg) |
+| 1/64 | 0.0524240049233 | ![frame10](../lab1_output/motion_estimation/time_domain_1_64/10.jpg) | ![frame20](../lab1_output/motion_estimation/time_domain_1_64/20.jpg) | ![frame30](../lab1_output/motion_estimation/time_domain_1_64/30.jpg) | ![frame40](../lab1_output/motion_estimation/time_domain_1_64/40.jpg) |
+
+随着使用越来越少的像素点,MSE在不断增大.1/64的MSE就比较大了.
+
+实际上在视频中也可以看出来,使用1/64的像素点的时候已经基本不能正确地进行运动估计了.因为这个时候实际上只是用参考块最中央的4个像素在做block matching,整张图片中很可能出现和这4个点非常相似的区域.这4的像素点远远没有左上角的4个DCT系数那样反映整个参考块性质的能力.
+
+### pixel和frequency domain的比较
+
+| AVERAGE MSE | pixel           | compression     |
+| ----------- | --------------- | --------------- |
+| all         | 0.0077588178336 | 0.0077588178336 |
+| 1/4         | 0.0155073435965 | 0.0077682039137 |
+| 1/16        | 0.0155819810223 | 0.0093794298311 |
+| 1/64        | 0.0524240049233 | 0.0161975308642 |
+
+从理论上讲,使用全部像素点的pixel domain的方式得到的MSE一定是最小的,因为它本身就是在后继帧中寻找MSE最小的块.然而在这种情况下,compression domain的方法得到的MSE完全不比pixel domain差.当我们使用更少的点进行匹配的时候,我们就发现compression domain的效果远远胜过pixel domain.
+
+如果我们有能力使用全部的点进行block matching,在pixel domain是更好的.因为compression domain的效果不会更好,反而会因为DCT操作而消耗更多的时间.
+
+但是当我们要选取少于参考块的像素点个数的特征进行block matching的时候,在compression domain应该是更好的选择.
+
+### 改进的思路
+
+#### 中间区域有更大的权重(center_weight)
+
+在pixel domain,让每个块的中间区域在计算MSE的时候有更大的权重,因为中间区域的内容一般更重要.与只取中间部分的像素点相比,这样可以兼顾块四周的内容.
+
+下面的实现中,在使用1/4的像素点的基础上,对中间1/16像素点增加权重.
+
+| 权重   | average MSE     | 10                                       | 20                                       | 30                                       | 40                                       |
+| ---- | --------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| 2    | 0.0153081818603 | ![10](../lab1_output/motion_estimation/center_weight_2/10.jpg) | ![20](../lab1_output/motion_estimation/center_weight_2/20.jpg) | ![30](../lab1_output/motion_estimation/center_weight_2/30.jpg) | ![40](../lab1_output/motion_estimation/center_weight_2/40.jpg) |
+| 4    | 0.0120025337477 | ![10](../lab1_output/motion_estimation/center_weight_4/10.jpg) | ![20](../lab1_output/motion_estimation/center_weight_4/20.jpg) | ![30](../lab1_output/motion_estimation/center_weight_4/30.jpg) | ![40](../lab1_output/motion_estimation/center_weight_4/40.jpg) |
+| 8    | 0.0122537392136 | ![10](../lab1_output/motion_estimation/center_weight_8/10.jpg) | ![20](../lab1_output/motion_estimation/center_weight_8/20.jpg) | ![30](../lab1_output/motion_estimation/center_weight_8/30.jpg) | ![40](../lab1_output/motion_estimation/center_weight_8/40.jpg) |
+
+![2](../lab1_output/motion_estimation/center_weight_2_MSE-frame_number.png)
+
+![4](../lab1_output/motion_estimation/center_weight_4_MSE-frame_number.png)
+
+![8](../lab1_output/motion_estimation/center_weight_8_MSE-frame_number.png)
+
+| METHOD          | AVERAGE MSE     |
+| --------------- | --------------- |
+| center_weight 2 | 0.0153081818603 |
+| center_weight 2 | 0.0120025337477 |
+| center_weight 2 | 0.0122537392136 |
+| only 1/4        | 0.0155073435965 |
+| only 1/16       | 0.0155819810223 |
+
+可以看出,相比只使用1/4或者1/16的像素点的结果,使用1/4的像素点,同时将中央1/16的像素点赋予更高的权重,得到的结果是更好的. 
+
+这种方式使用了更少的像素点进行计算,而且还一方面兼顾了四周的像素点,另一方面有突出了中心区域的重要性,因此取得了更好的效果.
+
+#### 阈值计数(count)
+
+我们考虑这样一种情况:一辆车从绿色的草地旁边行驶到灰色的路面上,而车的大小小于参考块,那么这个时候我们对车进行运动估计,参考块和后继帧中车所属的块的MSE就会比较大.但是这主要是由于背景导致的,主要内容都是车,是相同的.
+
+所以在进行块匹配的时候,也许可以不使用MSE最小作为标准,而使用误差小于某个阈值的像素点数目作为标准.这样相当于只考虑两个块之间接近部分的面积,而不去考虑不相似的部分.
+
+| 阈值   | average MSE      | 10                                       | 20                                       | 30                                       | 40                                       |
+| ---- | ---------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| 1e-1 | 0.00860989630057 | ![10](../lab1_output/motion_estimation/counter_1e-1/10.jpg) | ![20](../lab1_output/motion_estimation/counter_1e-1/20.jpg) | ![30](../lab1_output/motion_estimation/counter_1e-1/30.jpg) | ![40](../lab1_output/motion_estimation/counter_1e-1/40.jpg) |
+| 1e-2 | 0.0144775972026  | ![10](../lab1_output/motion_estimation/counter_1e-2/10.jpg) | ![20](../lab1_output/motion_estimation/counter_1e-2/20.jpg) | ![30](../lab1_output/motion_estimation/counter_1e-2/30.jpg) | ![40](../lab1_output/motion_estimation/counter_1e-2/40.jpg) |
+
+![1e-1](../lab1_output/motion_estimation/counter_1e-1_MSE-frame_number.png)
+
+![1e-1](../lab1_output/motion_estimation/counter_1e-2_MSE-frame_number.png)
+
+可以看出,如果阈值合适的话,这种方式的MSE也是很小的.当然肯定比不上使用全部点的time domain和compression domain的block matching,但是相比它们,这种方法的计算量小得多.
+
+但是如果阈值不合适,比如上面阈值为1e-2的情况,虽然总的MSE看起来还不是很大(没有使用1/64的DCT系数的结果大),但是实际上内容中有好几帧都没有正确地追踪到车的位置.
+
+### 算法的缺点
+
+全图的块匹配,不论是pixel domain还是frequency domain,速度都非常慢,远远赶不上实际视频的帧速度.因此需要启发式的搜索方式来减少计算量,或者使用其他算法(比如optical flow)进行运动估计.
+
+## 运行说明
+
+``` python
+python3 motion_estimation.py
+```
+
+- 运行环境: python3.6, 需要numpy,av,scipy,matplotlib
+- 大约20分钟之内可以运行完,会生成全部的8+5个视频和(8+5)*(45+1)张图片
 
